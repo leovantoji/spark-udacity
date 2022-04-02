@@ -1,4 +1,4 @@
-# (Udacity Spark Course)[https://www.udacity.com/course/learn-spark-at-udacity--ud2002]
+# [Udacity Spark Course](https://www.udacity.com/course/learn-spark-at-udacity--ud2002)
 
 ## The Power of Spark
 Spark is currently one of the most popular tools for big data analytics. You might have heard of other tools such as Hadoop. Hadoop is a slightly older technology although still in use by some companies. Spark is generally faster than Hadoop, which is why Spark has become more popular over the last few years.
