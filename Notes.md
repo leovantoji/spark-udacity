@@ -85,5 +85,13 @@ The first component of a Spark program is a Spark Context, which is the main ent
 ![pic](images/query_optimizer.png)
 
 ## Setting up Spark Clusters with AWS
+Overview of the Set up of a Spark Cluster
+- Amazon S3 will store the dataset.
+- We rent a cluster of machines, i.e., our Spark Cluster, and iti s located in AWS data centers. We rent these using AWS service called Elastic Compute Cloud (EC2).
+- We log in from your local computer to this Spark cluster.
+- Upon running our Spark code, the cluster will load the dataset from Amazon S3 into the cluster’s memory distributed across each machine in the cluster.
+
+![gif](images/spark_cluster.gif)
+
 ## Debugging and Optimisation
 ## Machine Learning with Spark
