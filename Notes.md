@@ -86,12 +86,38 @@ The first component of a Spark program is a Spark Context, which is the main ent
 
 ## Setting up Spark Clusters with AWS
 Overview of the Set up of a Spark Cluster
-- Amazon S3 will store the dataset.
-- We rent a cluster of machines, i.e., our Spark Cluster, and iti s located in AWS data centers. We rent these using AWS service called Elastic Compute Cloud (EC2).
+- **Amazon S3** will store the dataset.
+- We rent a cluster of machines, i.e., our **Spark Cluster**, and iti s located in AWS data centers. We rent these using AWS service called **Elastic Compute Cloud (EC2)**.
 - We log in from your local computer to this Spark cluster.
 - Upon running our Spark code, the cluster will load the dataset from Amazon S3 into the cluster’s memory distributed across each machine in the cluster.
 
+New terms:
+- **Local mode**: You are running a Spark program on your laptop like a single machine.
+- **Standalone mode**: You are defining Spark Primary and Secondary to work on your (virtual) machine. You can do this on EMR or your machine. Standalone mode uses a resource manager like YARN or Mesos.
+
 ![gif](images/spark_cluster.gif)
+
+Create EMR cluster from the CLI:
+```cli
+aws emr create-cluster --name <cluster_name> \
+--use-default-roles --release-label emr-5.28.0  \
+--instance-count 3 --applications Name=Spark Name=Zeppelin  \
+--bootstrap-actions Path="s3://bootstrap.sh" \
+--ec2-attributes KeyName=<Key-pair-file-name>, SubnetId=<subnet-Id> \
+--instance-type m5.xlarge --log-uri s3:///emrlogs/
+```
+
+Options: 
+- ` --name`: You can give any name of your choice. This will show up on your AWS EMR UI.
+- `--release-label`: This is the version of EMR you’d like to use.
+- `--instance-count`: Annotates instance count. One is for the primary, and the rest are for the secondary. For example, if `--instance-count` is given 4, then 1 instance will be reserved for primary, then 3 will be reserved for secondary instances.
+- `--applications`: List of applications you want to pre-install on your EMR at the launch time
+- `--bootstrap-actions`: The Path attribute provides the path to a file (residing in S3 or locally) that contains a script that runs during a bootstrap action. The script may set environmental variables in all the instances of the cluster. This file must be accessible to each instance in the cluster.
+- `--ec2-attributes`: The KeyName field specifies your key-pair file name, for example, if it is MyKey.pem, just specify MyKey for this field. There is one more field that you should specify, SubnetId. The aws documentation says that the cluster must be launched within an EC2-VPC. Therefore, you need to provide the VPC subnet Id in which to create the cluster. If you do not specify this value, the cluster is launched in the normal AWS cloud, outside of any VPC. Go to the VPC service in the web console to copy any of the subnet IDs within the default VPC. If you do not see a default VPC in your account, use a simple command to create a default VPC: `aws ec2 create-default-vpc --profile <profile-name>`
+- `--instance-type`: Specify the type of instances you want to use. Detailed list can be accessed here, but find the one that can fit your data and your budget.
+- `--log-uri`: S3 location to store your EMR logs in. This log can store EMR metrics and also the metrics/logs for submission of your code.
+
+
 
 ## Debugging and Optimisation
 ## Machine Learning with Spark
