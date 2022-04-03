@@ -118,6 +118,77 @@ Options:
 - `--log-uri`: S3 location to store your EMR logs in. This log can store EMR metrics and also the metrics/logs for submission of your code.
 
 
+While the use of Jupyter Notebook is common across the industry, you can explore using Zeppelin notebooks. Zeppelin notebooks have been available since EMR 5.x versions, and they have **direct access to Spark Context**, such as a local spark-shell. For example, if you type `sc`, you’ll be able to get Spark Context within Zeppelin notebooks.
+
+Submitting Spark Script Instructions: `spark-submit <filename>.py`
+
+Data engineers always save their initial, final, and intermediate data of the data pipeline in the S3 for future retrieval. It is best practice to move your files from your local machine to AWS S3, then use the program to read the data from AWS S3.
+
+The letter change on the URI scheme makes a big difference because it causes different software to be used to interface to S3. [Difference](https://stackoverflow.com/questions/33356041/technically-what-is-the-difference-between-s3n-s3a-and-s3) between `s3`, `s3n` and `s3a`:
+- The difference between `s3` and `s3n`/`s3a` is that `s3` is a block-based overlay on top of Amazon S3, while `s3n`/`s3a` are not (they are object-based).
+- The difference between `s3n` and `s3a` is that `s3n` supports objects up to 5GB in size, while `s3a` supports objects up to 5TB and has higher performance (both are because it uses multi-part upload). `s3a` is the successor to `s3n`.
+
+Differences between HDFS and AWS S3:
+- **AWS S3 is an object storage system** that stores the data using key value pairs, namely bucket and key, and **HDFS is an actual distributed file system** which guarantees fault tolerance. HDFS achieves fault tolerance by having duplicate factors, which means it will duplicate the same files at 3 different nodes across the cluster by default (it can be configured to different numbers of duplication).
+- HDFS has usually been **installed in on-premise systems**, and traditionally have had engineers on-site to maintain and troubleshoot Hadoop Ecosystem, which **cost more than having data on cloud**. Due to the **flexibility of location** and **reduced cost of maintenance**, cloud solutions have been more popular. With extensive services you can use within AWS, S3 has been a more popular choice than HDFS.
+- Since **AWS S3 is a binary object store**, it can **store all kinds of format**, even images and videos. HDFS will strictly require a certain file format - the popular choices are **avro** and **parquet**, which have relatively high compression rate and which makes it useful to store large dataset.
 
 ## Debugging and Optimisation
+Debugging Spark is harder on Standalone mode:
+- Previously, we ran Spark codes in the local mode where you can easily fix the code on your laptop because you can view the error in your code on your local machine.
+- For Standalone mode, the cluster (group of manager and executor) load data, distribute the tasks among them and the executor executes the code. The result is either a successful output or a log of the errors. The logs are captured in a separate machine than the executor, which makes it important to interpret the syntax of the logs - this can get tricky.
+- One other thing that makes the standalone mode difficult to deploy the code is that your laptop environment will be **completely different than AWS EMR** or other cloud systems. As a result, you will always have to test your code rigorously on different environment settings to make sure the code works.
+
+**Accumulators** are variables that accumulate. Because Spark runs in distributed mode, the workers are running in parallel, but asynchronously. For example, worker 1 will not be able to know how far worker 2 and worker 3 are done with their tasks. With the same analogy, the variables that are local to workers are not going to be shared to another worker unless you accumulate them. Accumulators are used for mostly sum operations, like in Hadoop MapReduce, but you can implement it to do otherwise.
+
+**Broadcast variables** in Apache Spark is a mechanism for sharing variables across executors that are meant to be read-only. Without broadcast variables these variables would be shipped to each executor for every transformation and action, and this can cause network overhead. However, with broadcast variables, they are shipped once to all executors and are cached for future reference. [MORE INFO HERE](https://www.edureka.co/blog/broadcast-variables/)
+- Broadcast join is a way of joining a large table and small table in Spark.
+- Broadcast join is like a map-side join in MapReduce.
+
+Broadcast Variables Use case: Imagine that while doing a transformation we need to lookup a large table of zip codes/pin codes. Here, it is neither feasible to send the large lookup table every time to the executors, nor can we query the database every time. The solution should be to convert this lookup table to a broadcast variables and Spark will cache it in every executor for future reference.
+```python
+
+from pyspark import SparkContext
+
+sc = SparkContext('local[*]', 'pyspark')
+
+my_dict = {"item1": 1, "item2": 2, "item3": 3, "item4": 4} 
+my_list = ["item1", "item2", "item3", "item4"]
+
+my_dict_bc = sc.broadcast(my_dict)
+
+def my_func(letter):
+    return my_dict_bc.value[letter] 
+
+my_list_rdd = sc.parallelize(my_list)
+
+result = my_list_rdd.map(lambda x: my_func(x)).collect()
+
+print(result)
+```
+
+There are two types of functions in Spark: **transformations** and **actions**. Spark uses lazy evaluation to evaluate RDD and dataframe. Lazy evaluation means the code is not executed until it is needed. This is significant because you can **chain your RDD or dataframe as much as you want**, but it might not do anything until you actually **trigger** with some **action words**. And if you have lengthy transformations, then it might take your executors quite some time to complete all the tasks.
+
+Setting Log Level in the Spark Context:
+```python
+spark.sparkContext.setLogLevel("ERROR") # only error messages
+spark.sparkContext.setLogLevel("INFO") # more verbose messages
+```
+
+In the real world, you’ll see a lot of cases where the data is skewed. **Skewed data** means due to **non-optimal partitioning**, the data is heavy on few partitions. This could be problematic. Imagine you’re processing this dataset, and the data is distributed through your cluster by partition. In this case, only a few partitions will continue to work, while the rest of the partitions do not work. If you were to run your cluster like this, you will get billed by the time of the data processing, which means you will get billed for the duration of the longest partitions working. This isn’t optimized, so we would like to re-distribute the data in a way so that all the partitions are working.
+
+|non-optimal partitioning with skewed data|optimal partitioning with skewed data|
+|:-:|:-:|
+|![pic](images/timetocomplete1.png)|![pic](images/timetocomplete2.png)|
+
+In order to look at the skewness of the data:
+- Check for MIN, MAX and data RANGES
+- Examine how the workers are working
+- Identify workers that are running longer and aim to optimize it.
+
+Solutions to skewed data problems:
+- Use Alternate Columns that are more normally distributed.
+- Make Composite Keys: For instance, you can make composite keys by combining two columns so that the new column can be used as a composite key. 
+- Partition by number of Spark workers: Another easy way is using the Spark workers. If you know the number of your workers for Spark, then you can easily partition the data by the number of workers `df.repartition(number_of_workers)` to repartition your data evenly across your workers. For example, if you have 8 workers, then you should do `df.repartition(8)` before doing any operations.
+
 ## Machine Learning with Spark
