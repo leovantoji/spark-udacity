@@ -192,3 +192,7 @@ Solutions to skewed data problems:
 - Partition by number of Spark workers: Another easy way is using the Spark workers. If you know the number of your workers for Spark, then you can easily partition the data by the number of workers `df.repartition(number_of_workers)` to repartition your data evenly across your workers. For example, if you have 8 workers, then you should do `df.repartition(8)` before doing any operations.
 
 ## Machine Learning with Spark
+Spark supports two machine learning libraries `spark.ml` and `spark.mllib`. Both libraries are part of Spark's Machine Learning Library known as MLlib.
+
+![pic](images/sparkml.png)
+![pic](images/ml_parallelisation.png)
